@@ -16,7 +16,14 @@ sys.path.insert(0, wedding_system_dir)
 os.chdir(wedding_system_dir)
 
 # Import the Flask app from the wedding_invitation_system directory
-from app import app
+# Use importlib to avoid circular import issues
+import importlib.util
+spec = importlib.util.spec_from_file_location("wedding_app", os.path.join(wedding_system_dir, "app.py"))
+wedding_app = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(wedding_app)
+
+# Get the Flask app instance
+app = wedding_app.app
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
