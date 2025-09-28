@@ -4,6 +4,7 @@ from datetime import datetime
 import pytz
 import uuid
 import os
+import shutil
 from dotenv import load_dotenv
 import qrcode
 from io import BytesIO
@@ -284,10 +285,36 @@ def guest_stats():
     }
     return jsonify(stats)
 
+def check_chrome_availability():
+    """בדיקה אם Chrome זמין במערכת"""
+    import shutil
+    
+    # בדיקת Chrome binary
+    chrome_paths = [
+        "/opt/google/chrome/chrome",
+        "/usr/bin/google-chrome",
+        "/usr/bin/google-chrome-stable", 
+        "/app/.chrome-for-testing/chrome-linux64/chrome",
+        "google-chrome",
+        "chrome"
+    ]
+    
+    for path in chrome_paths:
+        if shutil.which(path) or os.path.exists(path):
+            return True
+    return False
+
 @app.route('/api/send_invitations', methods=['POST'])
 def api_send_invitations():
     """API להפעלת בוט שליחת הזמנות"""
     try:
+        # בדיקה אם Chrome זמין
+        if not check_chrome_availability():
+            return jsonify({
+                'success': False,
+                'message': 'שירות WhatsApp לא זמין כרגע בסביבת השרת. אנא נסה שוב מאוחר יותר או צור קשר עם המפתח.'
+            })
+        
         import subprocess
         import sys
         
@@ -312,6 +339,13 @@ def api_send_invitations():
 def api_send_reminders():
     """API להפעלת בוט שליחת תזכורות"""
     try:
+        # בדיקה אם Chrome זמין
+        if not check_chrome_availability():
+            return jsonify({
+                'success': False,
+                'message': 'שירות WhatsApp לא זמין כרגע בסביבת השרת. אנא נסה שוב מאוחר יותר או צור קשר עם המפתח.'
+            })
+        
         import subprocess
         import sys
         

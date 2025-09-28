@@ -53,19 +53,50 @@ class WhatsAppBot:
         chrome_options.add_experimental_option("useAutomationExtension", False)
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--headless")  # Required for server environment
+        chrome_options.add_argument("--remote-debugging-port=9222")
+        chrome_options.add_argument("--disable-web-security")
+        chrome_options.add_argument("--disable-features=VizDisplayCompositor")
         chrome_options.add_argument(
             "--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
 
-        profile_path = os.path.join(os.getcwd(), "whatsapp_profile")
-        chrome_options.add_argument(f"--user-data-dir={profile_path}")
+        # In production/server environment, don't use persistent profile
+        if os.getenv("RENDER") or os.getenv("PORT"):
+            # Running in production - don't persist profile
+            print("🔧 Running in production mode - temporary profile")
+        else:
+            # Local development - use persistent profile
+            profile_path = os.path.join(os.getcwd(), "whatsapp_profile")
+            chrome_options.add_argument(f"--user-data-dir={profile_path}")
 
         try:
+            # Check for Chrome binary in common locations for Render/production
+            chrome_binary_path = None
+            possible_paths = [
+                "/opt/google/chrome/chrome",  # Common in Docker/production
+                "/usr/bin/google-chrome",     # Alternative location
+                "/usr/bin/google-chrome-stable",
+                "/app/.chrome-for-testing/chrome-linux64/chrome"  # Buildpack location
+            ]
+            
+            for path in possible_paths:
+                if os.path.exists(path):
+                    chrome_binary_path = path
+                    break
+            
+            if chrome_binary_path:
+                chrome_options.binary_location = chrome_binary_path
+                print(f"🔧 Using Chrome binary: {chrome_binary_path}")
+
+            # Try to find chromedriver
             local_driver = os.path.join(os.getcwd(), "chromedriver.exe")
             if os.path.exists(local_driver):
                 service = Service(local_driver)
             else:
+                # Use webdriver-manager to install/find chromedriver
                 service = Service(ChromeDriverManager().install())
 
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
