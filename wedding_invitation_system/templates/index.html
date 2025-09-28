@@ -1,0 +1,249 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="wedding-header">
+    <h1><i class="fas fa-rings-wedding"></i> מערכת ניהול הזמנות חתונה</h1>
+    <p class="lead">ברוכים הבאים למערכת הניהול המתקדמת שלכם</p>
+</div>
+
+<div class="row">
+    <div class="col-md-3">
+        <div class="stat-card">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4>{{ total_guests }}</h4>
+                    <p class="mb-0">סך הכל אורחים</p>
+                </div>
+                <i class="fas fa-users fa-2x opacity-75"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card success">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4>{{ confirmed_guests }}</h4>
+                    <p class="mb-0">אישרו הגעה</p>
+                </div>
+                <i class="fas fa-check-circle fa-2x opacity-75"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card info">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4>{{ total_attending }}</h4>
+                    <p class="mb-0">סך המגיעים</p>
+                </div>
+                <i class="fas fa-user-friends fa-2x opacity-75"></i>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="stat-card warning">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4>{{ pending_responses }}</h4>
+                    <p class="mb-0">ממתינים לתגובה</p>
+                </div>
+                <i class="fas fa-clock fa-2x opacity-75"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-chart-pie"></i> סטטיסטיקות בזמן אמת</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="guestChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="fas fa-tasks"></i> פעולות מהירות</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{{ url_for('add_guest') }}" class="btn btn-primary">
+                        <i class="fas fa-user-plus"></i> הוספת אורח חדש
+                    </a>
+                    <button onclick="sendInvitations()" class="btn btn-success">
+                        <i class="fab fa-whatsapp"></i> שליחת הזמנות WhatsApp
+                    </button>
+                    <button onclick="sendReminders()" class="btn btn-warning">
+                        <i class="fas fa-bell"></i> שליחת תזכורות
+                    </button>
+                    <button onclick="generateLinks()" class="btn btn-info">
+                        <i class="fas fa-link"></i> יצירת קישורים
+                    </button>
+                    <a href="{{ url_for('seating_chart') }}" class="btn btn-info">
+                        <i class="fas fa-chair"></i> סידור ישיבה
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5><i class="fas fa-info-circle"></i> הוראות שימוש</h5>
+            </div>
+            <div class="card-body">
+                <ol class="small">
+                    <li>הוסף אורחים במערכת</li>
+                    <li>הגדר את פרטי Twilio ב-.env</li>
+                    <li>שלח הזמנות דרך WhatsApp</li>
+                    <li>עקב אחרי התגובות</li>
+                    <li>תכנן סידור ישיבה</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+// טעינת נתונים לגרף
+fetch('/api/guest_stats')
+    .then(response => response.json())
+    .then(data => {
+        const ctx = document.getElementById('guestChart').getContext('2d');
+        new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['אישרו הגעה', 'לא יגיעו', 'ממתינים לתגובה'],
+                datasets: [{
+                    data: [data.confirmed, data.declined, data.pending],
+                    backgroundColor: [
+                        '#28a745',
+                        '#dc3545',
+                        '#ffc107'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    });
+
+function sendInvitations() {
+    if (confirm('האם אתה בטוח שברצונך לשלוח הזמנות לכל האורחים?\n\nהבוט יפתח חלון Chrome חדש ויתחבר לווצאפ ווב.')) {
+        // הצגת הוראות למשתמש
+        showInstructions('הזמנות');
+        
+        // הפעלת הבוט
+        fetch('/api/send_invitations', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('תהליך השליחה התחיל! בדוק את הטרמינל לעדכונים.');
+            } else {
+                alert('שגיאה: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('שגיאה בהפעלת הבוט');
+        });
+    }
+}
+
+function sendReminders() {
+    if (confirm('האם אתה בטוח שברצונך לשלוח תזכורות לאורחים שלא הגיבו?')) {
+        showInstructions('תזכורות');
+        
+        fetch('/api/send_reminders', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('תהליך שליחת התזכורות התחיל!');
+            } else {
+                alert('שגיאה: ' + data.message);
+            }
+        });
+    }
+}
+
+function generateLinks() {
+    if (confirm('האם ברצונך ליצור רשימת קישורים לכל האורחים?')) {
+        fetch('/api/generate_links', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // פתיחת חלון חדש עם הקישורים
+                const newWindow = window.open('', '_blank', 'width=800,height=600');
+                newWindow.document.write(`
+                    <html dir="rtl">
+                    <head>
+                        <title>קישורי אורחים</title>
+                        <style>
+                            body { font-family: Arial; padding: 20px; }
+                            .guest { margin: 10px 0; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+                            .link { color: blue; text-decoration: none; }
+                            .copy-btn { margin-left: 10px; padding: 5px 10px; }
+                        </style>
+                    </head>
+                    <body>
+                        <h2>קישורים ייחודיים לאורחים</h2>
+                        ${data.links.map(guest => `
+                            <div class="guest">
+                                <strong>${guest.name}</strong> (${guest.phone}) - ${guest.invited_count} מוזמנים<br>
+                                <a href="${guest.link}" target="_blank" class="link">${guest.link}</a>
+                                <button onclick="navigator.clipboard.writeText('${guest.link}')" class="copy-btn">העתק</button>
+                                <br>
+                                <a href="https://wa.me/${guest.clean_phone}?text=${encodeURIComponent('שלום ' + guest.name + '! הנה הקישור לאישור הגעה לחתונה: ' + guest.link)}" target="_blank">
+                                    📱 שלח בווצאפ
+                                </a>
+                            </div>
+                        `).join('')}
+                    </body>
+                    </html>
+                `);
+            } else {
+                alert('שגיאה ביצירת הקישורים');
+            }
+        });
+    }
+}
+
+function showInstructions(type) {
+    const instructions = type === 'הזמנות' ? 
+        'הוראות לשליחת הזמנות:\n\n1. יפתח חלון Chrome חדש\n2. סרוק QR code בווצאפ\n3. הבוט יתחיל לשלוח הודעות\n4. אל תסגור את החלון עד הסיום' :
+        'הוראות לשליחת תזכורות:\n\n1. הבוט יחפש צ\'אטים קיימים\n2. ישלח תזכורות לאורחים שלא הגיבו\n3. ניתן לעצור בכל עת';
+    
+    alert(instructions);
+}
+
+// עדכון סטטיסטיקות כל 30 שניות
+setInterval(() => {
+    location.reload();
+}, 30000);
+</script>
+{% endblock %}

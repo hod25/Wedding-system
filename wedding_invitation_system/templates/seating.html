@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}סידור ישיבה{% endblock %}
+
+{% block content %}
+<div class="wedding-header">
+    <h1><i class="fas fa-chair"></i> סידור ישיבה</h1>
+    <p class="lead">תכנון מושלם לחתונה מושלמת</p>
+</div>
+
+<div class="row">
+    <!-- שולחנות -->
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5><i class="fas fa-table"></i> שולחנות ({{ tables|length }})</h5>
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addTableModal">
+                    <i class="fas fa-plus"></i> הוסף שולחן
+                </button>
+            </div>
+            <div class="card-body">
+                {% if tables %}
+                    <div class="row">
+                        {% for table in tables %}
+                            {% set table_guests = guests_with_tables | selectattr('table_number', 'equalto', table.table_number) | list %}
+                            {% set occupied_seats = table_guests | map(attribute='confirmed_count') | sum %}
+                            
+                            <div class="col-md-6 mb-3">
+                                <div class="card border-{% if occupied_seats >= table.capacity %}danger{% elif occupied_seats > 0 %}warning{% else %}success{% endif %}">
+                                    <div class="card-header d-flex justify-content-between align-items-center py-2">
+                                        <strong>שולחן {{ table.table_number }}</strong>
+                                        <span class="badge bg-{% if occupied_seats >= table.capacity %}danger{% elif occupied_seats > 0 %}warning{% else %}success{% endif %}">
+                                            {{ occupied_seats }}/{{ table.capacity }}
+                                        </span>
+                                    </div>
+                                    <div class="card-body py-2">
+                                        {% if table.description %}
+                                            <p class="small text-muted mb-2">{{ table.description }}</p>
+                                        {% endif %}
+                                        
+                                        {% if table_guests %}
+                                            <div class="guest-list">
+                                                {% for guest in table_guests %}
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <span class="small">{{ guest.name }}</span>
+                                                        <div>
+                                                            <span class="badge bg-info">{{ guest.confirmed_count }}</span>
+                                                            <button class="btn btn-outline-danger btn-sm ms-1" 
+                                                                    onclick="removeFromTable({{ guest.id }})">
+                                                                <i class="fas fa-times"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <p class="text-muted small mb-0">שולחן ריק</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-table fa-3x text-muted mb-3"></i>
+                        <h5>אין שולחנות במערכת</h5>
+                        <p class="text-muted">התחל בהוספת השולחן הראשון</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- אורחים ללא שולחן -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h6><i class="fas fa-users"></i> אורחים ללא שולחן ({{ guests_without_tables|length }})</h6>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                {% if guests_without_tables %}
+                    {% for guest in guests_without_tables %}
+                        <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                            <div>
+                                <strong class="small">{{ guest.name }}</strong><br>
+                                <span class="badge bg-primary">{{ guest.confirmed_count }} אנשים</span>
+                            </div>
+                            <div class="btn-group">
+                                <button class="btn btn-outline-success btn-sm" 
+                                        onclick="showAssignModal({{ guest.id }}, '{{ guest.name }}')">
+                                    <i class="fas fa-chair"></i>
+                                </button>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-muted text-center">כל האורחים שאישרו הגעה משוייכים לשולחנות</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- סטטיסטיקות -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6><i class="fas fa-chart-bar"></i> סטטיסטיקות</h6>
+            </div>
+            <div class="card-body">
+                {% set total_capacity = tables | map(attribute='capacity') | sum %}
+                {% set total_assigned = guests_with_tables | map(attribute='confirmed_count') | sum %}
+                {% set total_unassigned = guests_without_tables | map(attribute='confirmed_count') | sum %}
+                
+                <div class="row text-center">
+                    <div class="col-6">
+                        <div class="stat-number text-primary">{{ total_capacity }}</div>
+                        <div class="small text-muted">סך מקומות</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-number text-success">{{ total_assigned }}</div>
+                        <div class="small text-muted">משוייכים</div>
+                    </div>
+                </div>
+                <div class="row text-center mt-2">
+                    <div class="col-6">
+                        <div class="stat-number text-warning">{{ total_unassigned }}</div>
+                        <div class="small text-muted">לא משוייכים</div>
+                    </div>
+                    <div class="col-6">
+                        <div class="stat-number text-info">{{ total_capacity - total_assigned }}</div>
+                        <div class="small text-muted">מקומות פנויים</div>
+                    </div>
+                </div>
+                
+                <div class="progress mt-3">
+                    <div class="progress-bar" style="width: {{ (total_assigned / total_capacity * 100) if total_capacity > 0 else 0 }}%"></div>
+                </div>
+                <div class="small text-center mt-1">תפוסה: {{ "%.1f"|format((total_assigned / total_capacity * 100) if total_capacity > 0 else 0) }}%</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal הוספת שולחן -->
+<div class="modal fade" id="addTableModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">הוספת שולחן חדש</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_table') }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="table_number" class="form-label">מספר שולחן</label>
+                        <input type="number" class="form-control" id="table_number" name="table_number" required min="1">
+                    </div>
+                    <div class="mb-3">
+                        <label for="capacity" class="form-label">כמות מקומות</label>
+                        <input type="number" class="form-control" id="capacity" name="capacity" value="8" min="1" max="20">
+                    </div>
+                    <div class="mb-3">
+                        <label for="description" class="form-label">תיאור (אופציונלי)</label>
+                        <input type="text" class="form-control" id="description" name="description" 
+                               placeholder="למשל: שולחן משפחה, חברי עבודה...">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+                    <button type="submit" class="btn btn-primary">הוסף שולחן</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Modal הוספת אורח לשולחן -->
+<div class="modal fade" id="assignTableModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">הקצאת שולחן</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="{{ url_for('assign_table') }}">
+                <div class="modal-body">
+                    <input type="hidden" id="assign_guest_id" name="guest_id">
+                    <p>בחר שולחן עבור <strong id="assign_guest_name"></strong>:</p>
+                    <div class="mb-3">
+                        <label for="assign_table_number" class="form-label">שולחן</label>
+                        <select class="form-select" id="assign_table_number" name="table_number" required>
+                            {% for table in tables %}
+                                {% set table_guests = guests_with_tables | selectattr('table_number', 'equalto', table.table_number) | list %}
+                                {% set occupied_seats = table_guests | map(attribute='confirmed_count') | sum %}
+                                <option value="{{ table.table_number }}" 
+                                        {% if occupied_seats >= table.capacity %}disabled{% endif %}>
+                                    שולחן {{ table.table_number }} ({{ occupied_seats }}/{{ table.capacity }})
+                                    {% if table.description %} - {{ table.description }}{% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ביטול</button>
+                    <button type="submit" class="btn btn-primary">הקצה לשולחן</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.stat-number {
+    font-size: 1.5rem;
+    font-weight: bold;
+}
+</style>
+
+<script>
+function showAssignModal(guestId, guestName) {
+    document.getElementById('assign_guest_id').value = guestId;
+    document.getElementById('assign_guest_name').textContent = guestName;
+    
+    const modal = new bootstrap.Modal(document.getElementById('assignTableModal'));
+    modal.show();
+}
+
+function removeFromTable(guestId) {
+    if (confirm('האם אתה בטוח שברצונך להסיר את האורח מהשולחן?')) {
+        // כאן תוכל להוסיף קריאה ל-API להסרה
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/assign_table';
+        
+        const guestInput = document.createElement('input');
+        guestInput.type = 'hidden';
+        guestInput.name = 'guest_id';
+        guestInput.value = guestId;
+        
+        const tableInput = document.createElement('input');
+        tableInput.type = 'hidden';
+        tableInput.name = 'table_number';
+        tableInput.value = '';
+        
+        form.appendChild(guestInput);
+        form.appendChild(tableInput);
+        document.body.appendChild(form);
+        form.submit();
+    }
+}
+</script>
+{% endblock %}

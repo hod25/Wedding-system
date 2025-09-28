@@ -1,0 +1,337 @@
+{% extends "base.html" %}
+
+{% block title %}ניהול אורחים{% endblock %}
+
+{% block content %}
+<div class="wedding-header">
+    <h1><i class="fas fa-users"></i> ניהול אורחים</h1>
+    <p class="lead">כל האורחים והסטטוס שלהם</p>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5><i class="fas fa-list"></i> רשימת אורחים ({{ guests|length }})</h5>
+        <div class="btn-group">
+            <button onclick="sendAllInvitations()" class="btn btn-success btn-sm">
+                <i class="fab fa-whatsapp"></i> שלח לכולם
+            </button>
+            <a href="{{ url_for('add_guest') }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-user-plus"></i> הוסף אורח
+            </a>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-info btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+                    <i class="fas fa-file-import"></i> ייבוא/ייצוא
+                </button>
+                <ul class="dropdown-menu">
+                    <li><a class="dropdown-item" href="{{ url_for('export_guests') }}">
+                        <i class="fas fa-download"></i> ייצוא לExcel
+                    </a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('download_template') }}">
+                        <i class="fas fa-file-download"></i> הורד תבנית
+                    </a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a class="dropdown-item" href="#" onclick="document.getElementById('importFile').click()">
+                        <i class="fas fa-upload"></i> ייבוא מExcel/CSV
+                    </a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- טופס ייבוא נסתר -->
+    <form id="importForm" action="{{ url_for('import_guests') }}" method="post" enctype="multipart/form-data" style="display: none;">
+        <input type="file" id="importFile" name="file" accept=".xlsx,.xls,.csv" onchange="document.getElementById('importForm').submit();">
+    </form>
+    <div class="card-body">
+        {% if guests %}
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>שם</th>
+                            <th>טלפון</th>
+                            <th>קבוצה</th>
+                            <th>צד</th>
+                            <th>מוזמנים</th>
+                            <th>מגיעים</th>
+                            <th>סטטוס</th>
+                            <th>מתנה</th>
+                            <th>הודעה נשלחה</th>
+                            <th>שולחן</th>
+                            <th>פעולות</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for guest in guests %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>
+                                <strong>{{ guest.name }}</strong>
+                                {% if guest.notes %}
+                                    <br><small class="text-muted">{{ guest.notes[:50] }}{% if guest.notes|length > 50 %}...{% endif %}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="https://wa.me/{{ guest.phone.replace('+', '').replace('-', '').replace(' ', '') }}" 
+                                   target="_blank" class="text-decoration-none">
+                                    <i class="fab fa-whatsapp text-success"></i> {{ guest.phone }}
+                                </a>
+                                {% if guest.email %}
+                                    <br><small><i class="fas fa-envelope"></i> {{ guest.email }}</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if guest.group_affiliation %}
+                                    <small class="text-muted">{{ guest.group_affiliation }}</small>
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if guest.side %}
+                                    <span class="badge bg-info">{{ guest.side }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-primary">{{ guest.invited_count }}</span>
+                            </td>
+                            <td>
+                                {% if guest.is_attending %}
+                                    <span class="badge bg-success">{{ guest.confirmed_count }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">0</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if guest.attendance_status %}
+                                    {% if guest.attendance_status == 'יגיע' %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> יגיע
+                                        </span>
+                                    {% elif guest.attendance_status == 'לא יגיע' %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times"></i> לא יגיע
+                                        </span>
+                                    {% elif guest.attendance_status == 'מתלבט' %}
+                                        <span class="badge bg-warning">
+                                            <i class="fas fa-question"></i> מתלבט
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            <i class="fas fa-clock"></i> ממתין
+                                        </span>
+                                    {% endif %}
+                                {% elif guest.response_date %}
+                                    {% if guest.is_attending %}
+                                        <span class="badge bg-success">
+                                            <i class="fas fa-check"></i> מגיע
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-danger">
+                                            <i class="fas fa-times"></i> לא מגיע
+                                        </span>
+                                    {% endif %}
+                                    <br><small class="text-muted">{{ guest.response_date.strftime('%d/%m %H:%M') }}</small>
+                                {% else %}
+                                    <span class="badge bg-warning">
+                                        <i class="fas fa-clock"></i> ממתין
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if guest.estimated_gift_amount and guest.estimated_gift_amount > 0 %}
+                                    <span class="badge bg-warning">₪{{ guest.estimated_gift_amount|int }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if guest.message_sent %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check"></i> נשלחה
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">
+                                        <i class="fas fa-times"></i> לא נשלחה
+                                    </span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if guest.table_number %}
+                                    <span class="badge bg-info">שולחן {{ guest.table_number }}</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">לא הוקצה</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm">
+                                    <a href="{{ url_for('rsvp_form', token=guest.unique_token) }}" 
+                                       class="btn btn-outline-primary" target="_blank" title="צפייה בטופס RSVP">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{{ url_for('edit_guest', guest_id=guest.id) }}" class="btn btn-outline-warning" title="עריכת אורח">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <button class="btn btn-outline-success" 
+                                            onclick="copyInvitationLink('{{ guest.unique_token }}')" 
+                                            title="העתקת קישור הזמנה">
+                                        <i class="fas fa-copy"></i>
+                                    </button>
+                                    <button class="btn btn-outline-info" 
+                                            onclick="sendWhatsApp('{{ guest.phone }}', '{{ guest.name }}')" 
+                                            title="שליחת WhatsApp">
+                                        <i class="fab fa-whatsapp"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5">
+                <i class="fas fa-users fa-4x text-muted mb-3"></i>
+                <h4>אין אורחים במערכת</h4>
+                <p class="text-muted">התחל בהוספת האורח הראשון</p>
+                <a href="{{ url_for('add_guest') }}" class="btn btn-primary">
+                    <i class="fas fa-user-plus"></i> הוסף אורח ראשון
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal להצגת קישור ההזמנה -->
+<div class="modal fade" id="invitationModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">קישור הזמנה</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="invitationLink" readonly>
+                    <button class="btn btn-outline-secondary" onclick="copyToClipboard()">
+                        <i class="fas fa-copy"></i> העתק
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyInvitationLink(token) {
+    const link = `${window.location.origin}/rsvp/${token}`;
+    document.getElementById('invitationLink').value = link;
+    
+    const modal = new bootstrap.Modal(document.getElementById('invitationModal'));
+    modal.show();
+}
+
+function copyToClipboard() {
+    const linkInput = document.getElementById('invitationLink');
+    linkInput.select();
+    document.execCommand('copy');
+    
+    // הצגת הודעת הצלחה
+    const button = event.target.closest('button');
+    const originalText = button.innerHTML;
+    button.innerHTML = '<i class="fas fa-check"></i> הועתק!';
+    button.classList.remove('btn-outline-secondary');
+    button.classList.add('btn-success');
+    
+    setTimeout(() => {
+        button.innerHTML = originalText;
+        button.classList.remove('btn-success');
+        button.classList.add('btn-outline-secondary');
+    }, 2000);
+}
+
+function sendWhatsApp(phone, name) {
+    const message = `שלום ${name}! הנה הקישור לאישור הגעה לחתונה שלנו: ${window.location.origin}/rsvp/[token]`;
+    const whatsappUrl = `https://wa.me/${phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+}
+
+function sendAllInvitations() {
+    if (confirm('🤖 שליחה אוטומטית לכל האורחים\n\nהבוט יפתח Chrome ויתחבר לווצאפ ווב.\nוודא שיש לך ווצאפ פעיל בטלפון.\n\nהאם להמשיך?')) {
+        
+        // הצגת הודעת טעינה
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading-overlay';
+        loadingDiv.innerHTML = `
+            <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; display: flex; justify-content: center; align-items: center; color: white; flex-direction: column;">
+                <div style="text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">🤖</div>
+                    <h3>הבוט עובד...</h3>
+                    <p>פותח את Chrome ומתחבר לווצאפ ווב</p>
+                    <div style="margin: 20px 0;">
+                        <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite; margin: 0 auto;"></div>
+                    </div>
+                    <p><small>אל תסגור את חלון הדפדפן עד הסיום</small></p>
+                    <button onclick="document.getElementById('loading-overlay').remove()" style="background: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer;">ביטול</button>
+                </div>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+        document.body.appendChild(loadingDiv);
+        
+        // הפעלת הבוט
+        fetch('/api/send_invitations', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loading-overlay')?.remove();
+            
+            if (data.success) {
+                alert('✅ הבוט החל לעבוד!\n\n📱 סרוק את קוד ה-QR בווצאפ ווב\n🤖 הבוט ישלח הודעות אוטומטית\n\nניתן לעקוב אחר ההתקדמות בקונסול');
+            } else {
+                alert('❌ שגיאה: ' + data.message);
+            }
+        })
+        .catch(error => {
+            document.getElementById('loading-overlay')?.remove();
+            console.error('Error:', error);
+            alert('❌ שגיאה בהפעלת הבוט');
+        });
+    }
+}
+
+// סינון בטבלה
+function filterTable() {
+    const input = document.getElementById('searchInput');
+    const filter = input.value.toLowerCase();
+    const table = document.querySelector('table tbody');
+    const rows = table.getElementsByTagName('tr');
+    
+    for (let i = 0; i < rows.length; i++) {
+        const name = rows[i].getElementsByTagName('td')[1];
+        const phone = rows[i].getElementsByTagName('td')[2];
+        
+        if (name && phone) {
+            const nameText = name.textContent.toLowerCase();
+            const phoneText = phone.textContent.toLowerCase();
+            
+            if (nameText.includes(filter) || phoneText.includes(filter)) {
+                rows[i].style.display = '';
+            } else {
+                rows[i].style.display = 'none';
+            }
+        }
+    }
+}
+</script>
+{% endblock %}

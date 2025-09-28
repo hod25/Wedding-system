@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSVP - {{ guest.name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 25px;
+        }
+        .wedding-header {
+            text-align: center;
+            color: white;
+            margin: 2rem 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .form-check-label {
+            font-weight: 500;
+        }
+        .guest-counter {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .counter-btn {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .counter-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #667eea;
+            min-width: 60px;
+            text-align: center;
+        }
+        .alert-custom {
+            border-radius: 15px;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show alert-custom" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+<div class="wedding-header">
+    <h1><i class="fas fa-envelope-open-text"></i> אישור הגעה</h1>
+    <p class="lead">שלום {{ guest.name }}! אנחנו שמחים להזמין אותך</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header text-center">
+                <h4><i class="fas fa-heart text-danger"></i> הזמנה לחתונה</h4>
+            </div>
+            <div class="card-body">
+                {% if guest.response_date %}
+                    <div class="alert alert-info text-center">
+                        <h5>תודה! כבר קיבלנו את התגובה שלך</h5>
+                        <p class="mb-0">
+                            {% if guest.is_attending %}
+                                <i class="fas fa-check-circle text-success"></i> 
+                                אישרת הגעה עם {{ guest.confirmed_count }} אנשים
+                            {% else %}
+                                <i class="fas fa-times-circle text-danger"></i> 
+                                דיווחת שלא תוכל/י להגיע
+                            {% endif %}
+                        </p>
+                        <small class="text-muted">תגובה נקלטה ב-{{ guest.response_date.strftime('%d/%m/%Y %H:%M') }}</small>
+                    </div>
+                {% endif %}
+
+                <form method="POST" class="mt-4">
+                    <div class="text-center mb-4">
+                        <h5>מוזמנים: {{ guest.invited_count }} אנשים</h5>
+                        <p class="text-muted">אנחנו מחכים לכם!</p>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label"><strong>האם תגיע/י לחתונה?</strong></label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="is_attending" id="attending_yes" 
+                                   value="yes" {% if guest.is_attending %}checked{% endif %} onchange="toggleAttendingCount()">
+                            <label class="form-check-label text-success" for="attending_yes">
+                                <i class="fas fa-check"></i> כן, אגיע!
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="is_attending" id="attending_no" 
+                                   value="no" {% if not guest.is_attending and guest.response_date %}checked{% endif %} onchange="toggleAttendingCount()">
+                            <label class="form-check-label text-danger" for="attending_no">
+                                <i class="fas fa-times"></i> לצערי לא אוכל להגיע
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="attending_count_section" style="display: none;" class="mb-4">
+                        <label class="form-label text-center d-block">
+                            <strong>כמה אנשים יגיעו מתוך {{ guest.invited_count }} המוזמנים?</strong>
+                        </label>
+                        
+                        <div class="guest-counter">
+                            <button type="button" class="counter-btn" onclick="decreaseCount()">
+                                <i class="fas fa-minus"></i>
+                            </button>
+                            <div class="counter-display" id="counter-display">
+                                {{ guest.confirmed_count if guest.confirmed_count > 0 else 1 }}
+                            </div>
+                            <button type="button" class="counter-btn" onclick="increaseCount()">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        
+                        <input type="hidden" name="confirmed_count" id="confirmed_count" 
+                               value="{{ guest.confirmed_count if guest.confirmed_count > 0 else 1 }}">
+                        
+                        <div class="text-center">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle"></i> 
+                                השתמש בכפתורים + ו - לבחירת מספר המגיעים
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="notes" class="form-label">הערות או בקשות מיוחדות</label>
+                        <textarea class="form-control" name="notes" id="notes" rows="3" 
+                                  placeholder="דרישות תזונה מיוחדות, נגישות, וכו'">{{ guest.notes or '' }}</textarea>
+                    </div>
+
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-paper-plane"></i> שליחת אישור
+                        </button>
+                    </div>
+                </form>
+
+                <div class="text-center mt-4 pt-4 border-top">
+                    <h6>קוד QR לקישור זה:</h6>
+                    <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code" class="img-fluid" style="max-width: 200px;">
+                    <p class="small text-muted mt-2">ניתן לשתף את הקוד עם בני המשפחה</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let maxGuests = {{ guest.invited_count }};
+let currentCount = {{ guest.confirmed_count if guest.confirmed_count > 0 else 1 }};
+
+function updateCounterDisplay() {
+    document.getElementById('counter-display').textContent = currentCount;
+    document.getElementById('confirmed_count').value = currentCount;
+    
+    // עדכון מצב כפתורים
+    const decreaseBtn = document.querySelector('.counter-btn:first-child');
+    const increaseBtn = document.querySelector('.counter-btn:last-child');
+    
+    decreaseBtn.disabled = currentCount <= 1;
+    increaseBtn.disabled = currentCount >= maxGuests;
+    
+    if (decreaseBtn.disabled) {
+        decreaseBtn.style.opacity = '0.5';
+    } else {
+        decreaseBtn.style.opacity = '1';
+    }
+    
+    if (increaseBtn.disabled) {
+        increaseBtn.style.opacity = '0.5';
+    } else {
+        increaseBtn.style.opacity = '1';
+    }
+}
+
+function increaseCount() {
+    if (currentCount < maxGuests) {
+        currentCount++;
+        updateCounterDisplay();
+    }
+}
+
+function decreaseCount() {
+    if (currentCount > 1) {
+        currentCount--;
+        updateCounterDisplay();
+    }
+}
+
+function toggleAttendingCount() {
+    const attendingYes = document.getElementById('attending_yes').checked;
+    const countSection = document.getElementById('attending_count_section');
+    
+    if (attendingYes) {
+        countSection.style.display = 'block';
+        updateCounterDisplay();
+    } else {
+        countSection.style.display = 'none';
+    }
+}
+
+// בדיקה ראשונית בטעינת העמוד
+document.addEventListener('DOMContentLoaded', function() {
+    toggleAttendingCount();
+    updateCounterDisplay();
+});
+</script>
+</body>
+</html>

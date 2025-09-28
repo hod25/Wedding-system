@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>תודה!</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.95);
+        }
+        .btn-primary {
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border: none;
+            border-radius: 25px;
+        }
+        .wedding-header {
+            text-align: center;
+            color: white;
+            margin: 2rem 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .alert-custom {
+            border-radius: 15px;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+<div class="wedding-header">
+    <h1><i class="fas fa-heart text-danger"></i> תודה רבה!</h1>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card text-center">
+            <div class="card-body py-5">
+                {% if guest.is_attending %}
+                    <i class="fas fa-check-circle text-success fa-4x mb-3"></i>
+                    <h3 class="text-success">נהדר! אנחנו מחכים לכם</h3>
+                    <p class="lead">{{ guest.name }}, תודה שאישרת הגעה</p>
+                    <p>רשמנו שיגיעו <strong>{{ guest.confirmed_count }}</strong> אנשים</p>
+                {% else %}
+                    <i class="fas fa-heart-broken text-warning fa-4x mb-3"></i>
+                    <h3 class="text-warning">נצטער שלא תוכלו להגיע</h3>
+                    <p class="lead">{{ guest.name }}, תודה על העדכון</p>
+                    <p>אנחנו מבינים ומקווים לראות אתכם בהזדמנות הבאה</p>
+                {% endif %}
+                
+                {% if guest.notes %}
+                    <div class="alert alert-info mt-3">
+                        <strong>ההערות שלך:</strong><br>
+                        {{ guest.notes }}
+                    </div>
+                {% endif %}
+                
+                <hr class="my-4">
+                
+                <div class="row text-center">
+                    <div class="col-6">
+                        <i class="fas fa-calendar text-primary fa-2x mb-2"></i>
+                        <h6>תאריך החתונה</h6>
+                        <p class="small text-muted">{{ "25/12/2025" }}</p>
+                    </div>
+                    <div class="col-6">
+                        <i class="fas fa-clock text-info fa-2x mb-2"></i>
+                        <h6>זמן ההגעה</h6>
+                        <p class="small text-muted">פרטים יישלחו בהמשך</p>
+                    </div>
+                </div>
+                
+                {% if guest.is_attending %}
+                    <div class="alert alert-success mt-3">
+                        <h6><i class="fas fa-info-circle"></i> חשוב לדעת:</h6>
+                        <ul class="small text-start mb-0">
+                            <li>פרטי המקום והזמן יישלחו אליכם בהמשך</li>
+                            <li>אם יש שינוי במספר המגיעים, תוכלו לעדכן כאן</li>
+                            <li>לשאלות נוספות, צרו קשר עם החתן והכלה</li>
+                        </ul>
+                    </div>
+                {% endif %}
+                
+                <div class="mt-4">
+                    <a href="{{ url_for('rsvp_form', token=guest.unique_token) }}" class="btn btn-outline-primary">
+                        <i class="fas fa-edit"></i> עדכון התגובה
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- שיתוף ברשתות חברתיות -->
+        <div class="card mt-3">
+            <div class="card-body text-center">
+                <h6><i class="fas fa-share-alt"></i> שתף את השמחה</h6>
+                <div class="btn-group">
+                    <a href="https://wa.me/?text=אני%20הולך%20לחתונה%20של%20החתן%20והכלה!" 
+                       class="btn btn-success btn-sm" target="_blank">
+                        <i class="fab fa-whatsapp"></i> WhatsApp
+                    </a>
+                    <a href="https://www.facebook.com/sharer/sharer.php" 
+                       class="btn btn-primary btn-sm" target="_blank">
+                        <i class="fab fa-facebook"></i> Facebook
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// אנימציה של האייקון
+document.addEventListener('DOMContentLoaded', function() {
+    const icon = document.querySelector('.fa-4x');
+    if (icon) {
+        setTimeout(() => {
+            icon.style.transform = 'scale(1.1)';
+            icon.style.transition = 'transform 0.3s ease';
+            
+            setTimeout(() => {
+                icon.style.transform = 'scale(1)';
+            }, 300);
+        }, 500);
+    }
+});
+</script>
+</body>
+</html>

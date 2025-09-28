@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}עריכת אורח{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <h2>עריכת אורח</h2>
+    <form method="post">
+        <div class="mb-3">
+            <label class="form-label">שם</label>
+            <input type="text" name="name" class="form-control" value="{{ guest.name }}" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">טלפון</label>
+            <input type="text" name="phone" class="form-control" value="{{ guest.phone }}" required>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">אימייל</label>
+            <input type="email" name="email" class="form-control" value="{{ guest.email or '' }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">קבוצה</label>
+            <input type="text" name="group_affiliation" class="form-control" value="{{ guest.group_affiliation or '' }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">צד</label>
+            <input type="text" name="side" class="form-control" value="{{ guest.side or '' }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">סטטוס הגעה</label>
+            <select name="attendance_status" class="form-select">
+                <option value="ממתין" {% if guest.attendance_status == 'ממתין' %}selected{% endif %}>ממתין</option>
+                <option value="יגיע" {% if guest.attendance_status == 'יגיע' %}selected{% endif %}>יגיע</option>
+                <option value="לא יגיע" {% if guest.attendance_status == 'לא יגיע' %}selected{% endif %}>לא יגיע</option>
+                <option value="מתלבט" {% if guest.attendance_status == 'מתלבט' %}selected{% endif %}>מתלבט</option>
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">הערות</label>
+            <textarea name="notes" class="form-control">{{ guest.notes or '' }}</textarea>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">מספר מוזמנים</label>
+            <input type="number" name="invited_count" class="form-control" value="{{ guest.invited_count }}">
+        </div>
+        <div class="mb-3">
+            <label class="form-label">סכום מתנה משוער</label>
+            <input type="number" name="estimated_gift_amount" class="form-control" value="{{ guest.estimated_gift_amount }}">
+        </div>
+        <button type="submit" class="btn btn-success">שמור שינויים</button>
+        <a href="{{ url_for('admin') }}" class="btn btn-secondary">ביטול</a>
+    </form>
+</div>
+{% endblock %}

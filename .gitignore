@@ -1,0 +1,76 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+eggs/
+*.egg-info/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.env
+venv*/
+
+# Pipenv
+Pipfile.lock
+
+# pyenv
+.python-version
+
+# IDEs and editors
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Pytest
+.pytest_cache/
+
+# MyPy
+.mypy_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Logs
+*.log
+
+# SQLite / database files
+*.sqlite3
+*.db
+*.db-journal
+
+# Flask instance folder (often contains local DB and config)
+instance/
+
+# Chrome/Chromium user data (whatsapp profile data and browser cache)
+whatsapp_profile/
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+
+# Temporary files
+*.tmp
+*.swp
+
+# PyInstaller
+__pycache__/
+build/
+dist/
