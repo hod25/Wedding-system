@@ -23,6 +23,12 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# ====== Configuration for Local WhatsApp Bot Integration ======
+BOT_API_KEY = os.getenv('BOT_API_KEY')  # Shared secret between hosted app and local bot
+DEFAULT_WEBSITE_URL = os.getenv('WEBSITE_URL', 'http://localhost:5000')
+COUPLE_NAMES = os.getenv('COUPLE_NAMES', 'הזוג')
+WEDDING_DATE = os.getenv('WEDDING_DATE', '')
+
 # הגדרת אזור הזמן
 def get_local_time():
     """מחזיר את הזמן הנוכחי באזור זמן ישראל"""
@@ -70,6 +76,17 @@ class Table(db.Model):
     description = db.Column(db.String(200))
     def __repr__(self):
         return f'<Table {self.table_number}>'
+
+# לוג הודעות לשליחה / כשלונות בוט
+class MessageLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    guest_id = db.Column(db.Integer, db.ForeignKey('guest.id'), nullable=False, index=True)
+    status = db.Column(db.String(20), nullable=False)  # sent / failed
+    error = db.Column(db.Text)  # פירוט שגיאה במקרה כשלון
+    created_at = db.Column(db.DateTime, default=get_local_time, index=True)
+
+    def __repr__(self):
+        return f'<MessageLog guest={self.guest_id} status={self.status}>'
 
     id = db.Column(db.Integer, primary_key=True)
     table_number = db.Column(db.Integer, unique=True, nullable=False)
@@ -307,6 +324,112 @@ def check_chrome_availability():
     
     print("🔍 Chrome not found in any expected location")  # Debug info
     return False
+
+# ====== Helper: API auth for local bot ======
+def require_bot_auth():
+    if not BOT_API_KEY:
+        return False, (jsonify({'success': False, 'message': 'BOT_API_KEY is not configured on server'}), 403)
+    provided = request.headers.get('X-API-KEY') or request.args.get('api_key')
+    if not provided or provided != BOT_API_KEY:
+        return False, (jsonify({'success': False, 'message': 'Unauthorized'}), 401)
+    return True, None
+
+# ====== Message generation for bot ======
+def build_invitation_message(guest: 'Guest') -> str:
+    base_link = f"{DEFAULT_WEBSITE_URL.rstrip('/')}/rsvp/{guest.unique_token}"
+    parts = [
+        f"שלום {guest.name}!",  # greeting
+        f"אתם מוזמנים ל{COUPLE_NAMES}!" if COUPLE_NAMES else "אתם מוזמנים לחתונה שלנו!",
+    ]
+    if WEDDING_DATE:
+        parts.append(f"התאריך: {WEDDING_DATE}")
+    parts.append(f"נשמח לאישור הגעה כאן: {base_link}")
+    if guest.invited_count and guest.invited_count > 1:
+        parts.append(f"מספר מקומות שמורים לכם: {guest.invited_count}")
+    return '\n'.join(parts)
+
+# ====== Bot-facing API endpoints (used only by local runner) ======
+from sqlalchemy import or_  # placed here to avoid circular issues if imported earlier
+import json  # lightweight usage
+
+@app.route('/api/bot/pending')
+def api_bot_pending():
+    ok, resp = require_bot_auth()
+    if not ok:
+        return resp
+    # limit param
+    try:
+        limit = int(request.args.get('limit', 20))
+    except ValueError:
+        limit = 20
+    limit = max(1, min(limit, 100))
+
+    # guests not yet sent (message_sent False) OR explicitly requested resend via ?resend=1 & failed entries
+    resend = request.args.get('resend') == '1'
+    q = Guest.query.filter_by(message_sent=False)
+    if resend:
+        # include those that previously failed (appear in MessageLog with status failed)
+        failed_ids = db.session.query(MessageLog.guest_id).filter(MessageLog.status == 'failed').distinct()
+        q = Guest.query.filter(or_(Guest.message_sent == False, Guest.id.in_(failed_ids)))  # noqa: E712
+    guests = q.order_by(Guest.id.asc()).limit(limit).all()
+
+    data = []
+    for g in guests:
+        data.append({
+            'id': g.id,
+            'name': g.name,
+            'phone': g.phone,
+            'invited_count': g.invited_count,
+            'unique_token': g.unique_token,
+            'message': build_invitation_message(g)
+        })
+    return jsonify({'success': True, 'count': len(data), 'guests': data})
+
+@app.route('/api/bot/mark', methods=['POST'])
+def api_bot_mark():
+    ok, resp = require_bot_auth()
+    if not ok:
+        return resp
+    payload = request.get_json(force=True, silent=True) or {}
+    sent_ids = payload.get('sent', []) or []
+    failures = payload.get('failed', []) or []  # list of {id, error}
+    updated = []
+    for gid in sent_ids:
+        g = Guest.query.get(gid)
+        if g and not g.message_sent:
+            g.message_sent = True
+            updated.append(gid)
+            db.session.add(MessageLog(guest_id=g.id, status='sent'))
+    for item in failures:
+        gid = item.get('id')
+        err = item.get('error')
+        g = Guest.query.get(gid) if gid else None
+        if g:
+            db.session.add(MessageLog(guest_id=g.id, status='failed', error=str(err)[:1000]))
+    db.session.commit()
+    return jsonify({'success': True, 'marked_sent': updated, 'failed_logged': len(failures)})
+
+@app.route('/api/bot/logs')
+def api_bot_logs():
+    ok, resp = require_bot_auth()
+    if not ok:
+        return resp
+    try:
+        limit = int(request.args.get('limit', 50))
+    except ValueError:
+        limit = 50
+    limit = max(1, min(limit, 200))
+    logs = MessageLog.query.order_by(MessageLog.id.desc()).limit(limit).all()
+    out = []
+    for l in logs:
+        out.append({
+            'id': l.id,
+            'guest_id': l.guest_id,
+            'status': l.status,
+            'error': l.error,
+            'created_at': l.created_at.isoformat()
+        })
+    return jsonify({'success': True, 'logs': out})
 
 @app.route('/api/send_invitations', methods=['POST'])
 def api_send_invitations():
