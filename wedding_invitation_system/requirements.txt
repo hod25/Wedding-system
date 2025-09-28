@@ -1,7 +1,8 @@
 Flask==2.3.3
 Flask-SQLAlchemy==3.0.5
 qrcode==7.4.2
-Pillow==10.0.1
+# Upgrade Pillow to a version compatible with Python 3.13 (10.0.1 fails to build wheel on 3.13)
+Pillow>=10.3.0
 requests==2.31.0
 python-dotenv==1.0.0
 selenium==4.21.0
