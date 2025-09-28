@@ -5,10 +5,6 @@ services:
     plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
-    buildpacks:
-      - url: https://github.com/heroku/heroku-buildpack-google-chrome.git
-      - url: https://github.com/heroku/heroku-buildpack-chromedriver.git
-      - url: https://github.com/heroku/heroku-buildpack-python.git
     envVars:
       - key: PYTHON_VERSION
         value: 3.13.4

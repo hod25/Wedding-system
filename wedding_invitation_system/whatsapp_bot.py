@@ -76,9 +76,9 @@ class WhatsAppBot:
             # Check for Chrome binary in common locations for Render/production
             chrome_binary_path = None
             possible_paths = [
-                "/opt/google/chrome/chrome",  # Common in Docker/production
-                "/usr/bin/google-chrome",     # Alternative location
-                "/usr/bin/google-chrome-stable",
+                "/usr/bin/google-chrome-stable",  # Most common location after apt install
+                "/usr/bin/google-chrome",         # Alternative location
+                "/opt/google/chrome/chrome",      # Docker/production
                 "/app/.chrome-for-testing/chrome-linux64/chrome"  # Buildpack location
             ]
             

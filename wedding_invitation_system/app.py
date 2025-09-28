@@ -291,17 +291,21 @@ def check_chrome_availability():
     
     # בדיקת Chrome binary
     chrome_paths = [
-        "/opt/google/chrome/chrome",
+        "/usr/bin/google-chrome-stable",  # Most common after apt install
         "/usr/bin/google-chrome",
-        "/usr/bin/google-chrome-stable", 
+        "/opt/google/chrome/chrome",
         "/app/.chrome-for-testing/chrome-linux64/chrome",
+        "google-chrome-stable",
         "google-chrome",
         "chrome"
     ]
     
     for path in chrome_paths:
         if shutil.which(path) or os.path.exists(path):
+            print(f"🔍 Found Chrome at: {path}")  # Debug info
             return True
+    
+    print("🔍 Chrome not found in any expected location")  # Debug info
     return False
 
 @app.route('/api/send_invitations', methods=['POST'])
@@ -312,7 +316,7 @@ def api_send_invitations():
         if not check_chrome_availability():
             return jsonify({
                 'success': False,
-                'message': 'שירות WhatsApp לא זמין כרגע בסביבת השרת. אנא נסה שוב מאוחר יותר או צור קשר עם המפתח.'
+                'message': '📱 שירות WhatsApp זמין רק בסביבת פיתוח מקומית. באפליקציה המוצגת באינטרנט, תוכל לצפות ברשימת האורחים, להוסיף אורחים, לקבל תגובות ולראות מי הגיע. שליחת הודעות WhatsApp מתבצעת בסביבה מקומית בלבד.'
             })
         
         import subprocess
@@ -327,7 +331,7 @@ def api_send_invitations():
         
         return jsonify({
             'success': True,
-            'message': 'תהליך השליחה התחיל בהצלחה'
+            'message': 'تהליך השליחה התחיל בהצלחה'
         })
     except Exception as e:
         return jsonify({
@@ -343,7 +347,7 @@ def api_send_reminders():
         if not check_chrome_availability():
             return jsonify({
                 'success': False,
-                'message': 'שירות WhatsApp לא זמין כרגע בסביבת השרת. אנא נסה שוב מאוחר יותר או צור קשר עם המפתח.'
+                'message': '📱 שירות WhatsApp זמין רק בסביבת פיתוח מקומית. באפליקציה המוצגת באינטרנט, תוכל לצפות ברשימת האורחים, להוסיף אורחים, לקבל תגובות ולראות מי הגיע. שליחת הודעות WhatsApp מתבצעת בסביבה מקומית בלבד.'
             })
         
         import subprocess
