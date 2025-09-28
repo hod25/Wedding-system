@@ -1,0 +1,2 @@
+-r wedding_invitation_system/requirements.txt
+gunicorn
