@@ -3,8 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "engines": {
-    "node": ">=20",
-    "python": "3.12"
+    "node": ">=20"
   },
   "scripts": {
     "prebuild": "node -v && npm -v && pnpm -v || true; python3 --version || true",
