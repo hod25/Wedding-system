@@ -2,6 +2,10 @@
   "name": "wedding-invitation-system",
   "version": "0.0.1",
   "private": true,
+  "engines": {
+    "node": ">=20",
+    "python": "3.12"
+  },
   "scripts": {
     "prebuild": "node -v && npm -v && pnpm -v || true; python3 --version || true",
     "build": "echo \"No JS build step configured.\" && exit 0"
