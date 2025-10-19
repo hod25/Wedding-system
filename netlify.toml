@@ -1,2 +1,2 @@
 [build.environment]
-PYTHON_VERSION = "3.10.6"
+PYTHON_VERSION = "3.9.16"
