@@ -1,5 +1,4 @@
 [build.environment]
-PYTHON_VERSION = "3.12"
 NODE_VERSION = "20"
 NPM_CONFIG_LOGLEVEL = "verbose"
 PNPM_LOG_LEVEL = "debug"
