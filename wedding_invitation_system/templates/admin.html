@@ -6,6 +6,7 @@
 <div class="wedding-header">
     <h1><i class="fas fa-users"></i> ניהול אורחים</h1>
     <p class="lead">כל האורחים והסטטוס שלהם</p>
+    {# Welcome message removed for a cleaner admin header #}
 </div>
 
 <div class="card">
@@ -19,6 +20,11 @@
             <a href="{{ url_for('add_guest') }}" class="btn btn-primary btn-sm">
                 <i class="fas fa-user-plus"></i> הוסף אורח
             </a>
+            {% if session.admin_logged_in %}
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm" title="התנתק">
+                <i class="fas fa-sign-out-alt"></i> התנתק
+            </a>
+            {% endif %}
             <div class="btn-group" role="group">
                 <button type="button" class="btn btn-info btn-sm dropdown-toggle" data-bs-toggle="dropdown">
                     <i class="fas fa-file-import"></i> ייבוא/ייצוא
@@ -27,6 +33,10 @@
                     <li><a class="dropdown-item" href="{{ url_for('export_guests') }}">
                         <i class="fas fa-download"></i> ייצוא לExcel
                     </a></li>
+                    <li><a class="dropdown-item" href="{{ url_for('export_for_bot') }}">
+                        <i class="fas fa-file-export"></i> הורד קובץ לבוט (WhatsApp)
+                    </a></li>
+                    <!-- simple export removed -->
                     <li><a class="dropdown-item" href="{{ url_for('download_template') }}">
                         <i class="fas fa-file-download"></i> הורד תבנית
                     </a></li>

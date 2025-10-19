@@ -275,6 +275,14 @@ def main():
     p_loop.add_argument('--limit', type=int, default=15)
     p_loop.add_argument('--headless', action='store_true')
 
+    p_file = sub.add_parser('send_file', help='Send messages from a local Excel/CSV file')
+    p_file.add_argument('path', help='Path to .xlsx/.xls/.csv file')
+    p_file.add_argument('--sheet', help='Sheet name or index (for Excel)', default=None)
+    p_file.add_argument('--phone-col', help='Column name that contains phone numbers (default: phone or נייד)', default=None)
+    p_file.add_argument('--name-col', help='Column name for recipient name (default: name or שם)', default=None)
+    p_file.add_argument('--message-col', help='Column name for message text (default: personal_message or message)', default=None)
+    p_file.add_argument('--dry-run', action='store_true', help='Do not actually send messages')
+
     args = parser.parse_args()
 
     if not BOT_API_KEY:
@@ -282,6 +290,79 @@ def main():
 
     if args.cmd == 'send_all':
         send_cycle(limit=args.limit, headless=args.headless, dry_run=args.dry_run, resend_failed=args.resend_failed)
+    elif args.cmd == 'send_file':
+        from pathlib import Path
+        import pandas as pd
+
+        path = Path(args.path)
+        if not path.exists():
+            print(f'❌ File not found: {path}')
+            return
+
+        # read file
+        try:
+            if path.suffix.lower() in ('.xlsx', '.xls'):
+                df = pd.read_excel(path, sheet_name=args.sheet, engine='openpyxl')
+            else:
+                df = pd.read_csv(path)
+        except Exception as e:
+            print(f'❌ Failed reading file: {e}')
+            return
+
+        # flexible column selection
+        def find_col(preferred):
+            if args.phone_col and args.phone_col in df.columns:
+                return args.phone_col
+            for cand in preferred:
+                if cand in df.columns:
+                    return cand
+            return None
+
+        phone_col = find_col([args.phone_col, 'phone', 'נייד', 'טלפון'])
+        name_col = find_col([args.name_col, 'name', 'שם'])
+        msg_col = find_col([args.message_col, 'personal_message', 'message', 'הודעה'])
+
+        if not phone_col:
+            print('❌ Could not find a phone column. Use --phone-col to specify the column name.')
+            return
+
+        bot = RemoteWhatsAppBot(headless=False)
+        if not bot.wait_for_login(timeout=300):
+            bot.close(); return
+
+        sent = []
+        failed = []
+        for idx, row in df.iterrows():
+            raw_phone = str(row.get(phone_col, '') or '')
+            phone = bot.normalize_phone(raw_phone)
+            name = str(row.get(name_col, '') or '')
+            message = ''
+            if msg_col and msg_col in df.columns:
+                message = str(row.get(msg_col) or '')
+            if not message:
+                # fallback to simple template
+                link = f"{WEBSITE_URL.rstrip('/')}/rsvp/{row.get('unique_token') or ''}"
+                message = f"שלום {name}!\nנשמח לאישור הגעה כאן: {link}"
+
+            print(f'Sending to {name} -> {phone}')
+            if args.dry_run:
+                print('DRY RUN:')
+                print(message[:200])
+                sent.append(None)
+                continue
+
+            if not bot.open_chat(phone):
+                failed.append({'phone': raw_phone, 'error': 'open_chat_failed'})
+                continue
+            ok = bot.send_message(message)
+            if ok:
+                sent.append(raw_phone)
+            else:
+                failed.append({'phone': raw_phone, 'error': 'send_failed'})
+            time.sleep(random.uniform(4, 9))
+
+        bot.close()
+        print(f'Finished. Sent: {len(sent)}, Failed: {len(failed)}')
     elif args.cmd == 'loop':
         while True:
             send_cycle(limit=args.limit, headless=args.headless, dry_run=False, resend_failed=False)

@@ -23,6 +23,70 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
+# --- Simple admin auth (session-based) ---
+from functools import wraps
+from flask import session
+
+ADMIN_USERNAME = os.getenv('ADMIN_USERNAME')
+ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD')
+
+def is_logged_in():
+    return session.get('admin_logged_in') is True
+
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        # allow public routes
+        public_prefixes = ['/rsvp', '/api/bot', '/_debug', '/static']
+        path = request.path
+        if any(path.startswith(p) for p in public_prefixes):
+            return f(*args, **kwargs)
+        if is_logged_in():
+            return f(*args, **kwargs)
+        return redirect(url_for('login', next=request.path))
+    return decorated
+
+
+@app.before_request
+def require_admin_for_nonpublic():
+    public_prefixes = ['/rsvp', '/api/bot', '/_debug', '/static']
+    path = request.path
+    if any(path.startswith(p) for p in public_prefixes):
+        return None
+    if path in ['/login', '/logout']:
+        return None
+    if is_logged_in():
+        return None
+    # allow guest-facing endpoints (keep RSVP and bot APIs public)
+    if path.startswith('/api/guest_stats'):
+        return None
+    return redirect(url_for('login', next=path))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        next_url = request.args.get('next') or url_for('admin')
+        if ADMIN_USERNAME and ADMIN_PASSWORD and username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session['admin_logged_in'] = True
+            flash('ברוך הבא', 'success')
+            return redirect(next_url)
+        else:
+            flash('שם משתמש או סיסמה שגויים', 'error')
+            return render_template('login.html')
+    else:
+        return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    session.pop('admin_logged_in', None)
+    flash('התנתקת', 'info')
+    return redirect(url_for('login'))
+    
+
 # ====== Configuration for Local WhatsApp Bot Integration ======
 BOT_API_KEY = os.getenv('BOT_API_KEY')  # Shared secret between hosted app and local bot
 DEFAULT_WEBSITE_URL = os.getenv('WEBSITE_URL', 'http://localhost:5000')
@@ -325,6 +389,22 @@ def check_chrome_availability():
     print("🔍 Chrome not found in any expected location")  # Debug info
     return False
 
+
+@app.route('/_debug/chrome')
+def debug_chrome():
+    """Lightweight debugging endpoint to check Chrome availability and env hints.
+    Does NOT return secrets like BOT_API_KEY or SECRET_KEY.
+    """
+    chrome_available = check_chrome_availability()
+    hints = {
+        'chrome_available': chrome_available,
+        'render_env': bool(os.getenv('RENDER')),
+        'port_set': bool(os.getenv('PORT')),
+        'database_url': bool(os.getenv('DATABASE_URL')),
+        'website_url': os.getenv('WEBSITE_URL', DEFAULT_WEBSITE_URL),
+    }
+    return jsonify({'success': True, 'hints': hints})
+
 # ====== Helper: API auth for local bot ======
 def require_bot_auth():
     if not BOT_API_KEY:
@@ -519,43 +599,7 @@ def api_generate_links():
             'message': f'שגיאה ביצירת הקישורים: {str(e)}'
         })
 
-@app.route('/export_guests')
-def export_guests():
-    """ייצוא כל האורחים לקובץ Excel"""
-    try:
-        guests = Guest.query.all()
-        
-        # יצירת רשימת נתונים
-        data = []
-        for guest in guests:
-            # מיפוי סטטוס נוכחות
-            if guest.attendance_status:
-                status = guest.attendance_status
-            elif guest.is_attending is True:
-                status = 'יגיע'
-            elif guest.is_attending is False:
-                status = 'לא יגיע'
-            else:
-                status = 'ממתין'
-                
-            # מיפוי סטטוס שליחת הזמנה
-            invitation_status = 'נשלחה' if guest.message_sent else 'לא נשלחה'
-            
-            data.append({
-                'שם המוזמן': guest.name,
-                'נייד': guest.phone,
-                'כמה יגיעו': guest.invited_count,
-                'שיוך לקבוצה': guest.group_affiliation or '',
-                'מהצד של...': guest.side or '',
-                'סטטוס הגעה (יגיע, מתלבט, לא יגיע)': status,
-                'סכום מתנה משוער': guest.estimated_gift_amount or 0,
-                'האם נשלחה הזמנה? (נשלחה, לא נשלחה)': invitation_status,
-                'mail': guest.email or '',
-                'הערות (מלל חופשי)': guest.notes or '',
-                'מספר הטלפון של המשתמש שהכניס את המוזמן באפליקציה': guest.added_by or ''
-            })
-        
-        # יצירת DataFrame
+
         df = pd.DataFrame(data)
         
         # יצירת קובץ זמני
@@ -573,6 +617,196 @@ def export_guests():
     except Exception as e:
         flash(f'שגיאה בייצוא: {str(e)}', 'error')
         return redirect(url_for('admin'))
+
+
+@app.route('/export_for_bot')
+def export_for_bot():
+    """Export guests into a bot-friendly Excel file containing:
+    - name
+    - phone_e164_no_plus (e.g. 972501234567 without leading +)
+    - link (personal RSVP link)
+    - personal_message (invitation text the bot can send)
+    """
+    try:
+        guests = Guest.query.all()
+        website_url = os.getenv('WEBSITE_URL', DEFAULT_WEBSITE_URL)
+
+        rows = []
+        for g in guests:
+            token = getattr(g, 'unique_token', None)
+            link = f"{website_url.rstrip('/')}/rsvp/{token}" if token else website_url
+            # Try to use existing message builder; fallback to a simple template
+            try:
+                message = build_invitation_message(g)
+            except Exception:
+                message = f"שלום {g.name}!\nנשמח לאישור הגעה כאן: {link}"
+
+            # normalize phone to E.164 without leading + (e.g. 97250...)
+            raw_phone = (g.phone or '')
+            digits = ''.join(ch for ch in raw_phone if ch.isdigit())
+            if digits.startswith('0') and len(digits) >= 10:
+                # convert local 0-leading Israeli numbers to 972...
+                digits = '972' + digits[1:]
+            elif raw_phone.startswith('+') and digits.startswith(''):
+                digits = digits.lstrip('+')
+
+            # determine RSVP status
+            if g.attendance_status:
+                status = g.attendance_status
+            elif g.is_attending is True:
+                status = 'יגיע'
+            elif g.is_attending is False:
+                status = 'לא יגיע'
+            else:
+                status = 'ממתין'
+
+            rows.append({
+                'guest_id': g.id,
+                'name': g.name,
+                'phone_e164_no_plus': digits,
+                'link': link,
+                'personal_message': message,
+                'status': status,
+            })
+
+        df = pd.DataFrame(rows)
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            df.to_excel(tmp.name, index=False, engine='openpyxl')
+            tmp_path = tmp.name
+
+        return send_file(
+            tmp_path,
+            as_attachment=True,
+            download_name=f'wedding_bot_upload_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx',
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        flash(f'שגיאה ביצירת קובץ לבוט: {str(e)}', 'error')
+        return redirect(url_for('admin'))
+
+
+@app.route('/export_for_bot_simple')
+def export_for_bot_simple():
+    """Export simplified Excel for the bot with only name and personal_message (contains RSVP link).
+    Useful if the bot UI only needs a two-column file (name + message) for bulk sending.
+    """
+    try:
+        guests = Guest.query.all()
+        website_url = os.getenv('WEBSITE_URL', DEFAULT_WEBSITE_URL)
+
+        rows = []
+        for g in guests:
+            token = getattr(g, 'unique_token', None)
+            link = f"{website_url.rstrip('/')}/rsvp/{token}" if token else website_url
+            try:
+                message = build_invitation_message(g)
+            except Exception:
+                message = f"שלום {g.name}!\nנשמח לאישור הגעה כאן: {link}"
+
+            # include raw phone as stored (so the bot can use it).
+            # include guest id and phone for reliable matching on upload
+            if g.attendance_status:
+                status = g.attendance_status
+            elif g.is_attending is True:
+                status = 'יגיע'
+            elif g.is_attending is False:
+                status = 'לא יגיע'
+            else:
+                status = 'ממתין'
+
+            rows.append({
+                'guest_id': g.id,
+                'name': g.name,
+                'phone': g.phone or '',
+                'personal_message': message,
+                'status': status,
+            })
+        df = pd.DataFrame(rows)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            df.to_excel(tmp.name, index=False, engine='openpyxl')
+            tmp_path = tmp.name
+
+        return send_file(
+            tmp_path,
+            as_attachment=True,
+            download_name=f'wedding_bot_simple_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx',
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        flash(f'שגיאה ביצירת קובץ לבוט: {str(e)}', 'error')
+        return redirect(url_for('admin'))
+
+
+@app.route('/upload_bot_results', methods=['POST'])
+def upload_bot_results():
+    """Accept an Excel/CSV file exported back from the local bot run.
+    Expected columns: guest_id (preferred) or phone, and optionally status or sent flag.
+    The endpoint will:
+      - mark guests as message_sent when present in file
+      - create MessageLog entries for sent or failed rows
+      - skip guests who already confirmed attendance (is_attending True)
+    """
+    if 'file' not in request.files:
+        flash('לא נבחר קובץ להתעדכון', 'error')
+        return redirect(url_for('admin'))
+    file = request.files['file']
+    if file.filename == '':
+        flash('לא נבחר קובץ', 'error')
+        return redirect(url_for('admin'))
+
+    try:
+        if file.filename.lower().endswith('.csv'):
+            df = pd.read_csv(file, encoding='utf-8-sig')
+        else:
+            df = pd.read_excel(file, engine='openpyxl')
+    except Exception as e:
+        flash(f'שגיאה בקריאת הקובץ: {e}', 'error')
+        return redirect(url_for('admin'))
+
+    # normalize columns to lower
+    cols = [str(c).strip() for c in df.columns]
+    df.columns = cols
+
+    updated = 0
+    skipped_confirmed = 0
+    for idx, row in df.iterrows():
+        gid = None
+        if 'guest_id' in df.columns:
+            try:
+                gid = int(row.get('guest_id'))
+            except Exception:
+                gid = None
+        if not gid and 'phone' in df.columns:
+            phone = str(row.get('phone') or '').strip()
+            g = Guest.query.filter_by(phone=phone).first()
+            gid = g.id if g else None
+        if not gid and 'phone_e164_no_plus' in df.columns:
+            phone = str(row.get('phone_e164_no_plus') or '').strip()
+            # try matching by normalized form
+            g = Guest.query.filter(Guest.phone.like(f"%{phone[-9:]}%" )).first()
+            gid = g.id if g else None
+
+        if not gid:
+            continue
+        guest = Guest.query.get(gid)
+        if not guest:
+            continue
+
+        # skip if already confirmed
+        if guest.is_attending:
+            skipped_confirmed += 1
+            continue
+
+        # mark message_sent and log
+        if not guest.message_sent:
+            guest.message_sent = True
+            db.session.add(MessageLog(guest_id=guest.id, status='sent'))
+            updated += 1
+
+    db.session.commit()
+    flash(f'עודכנו {updated} אורחים. דילוג על {skipped_confirmed} שאישרו הגעה.', 'success')
+    return redirect(url_for('admin'))
 
 @app.route('/import_guests', methods=['POST'])
 def import_guests():
@@ -816,6 +1050,51 @@ def download_template():
         
     except Exception as e:
         flash(f'שגיאה ביצירת התבנית: {str(e)}', 'error')
+        return redirect(url_for('admin'))
+
+
+@app.route('/export_guests')
+def export_guests():
+    """Export full guest list to Excel with all useful fields for admin.
+    Matches the admin template link `export_guests`.
+    """
+    try:
+        guests = Guest.query.order_by(Guest.id.asc()).all()
+        rows = []
+        for g in guests:
+            rows.append({
+                'id': g.id,
+                'name': g.name,
+                'phone': g.phone,
+                'email': g.email or '',
+                'invited_count': g.invited_count,
+                'confirmed_count': g.confirmed_count,
+                'group_affiliation': g.group_affiliation or '',
+                'side': g.side or '',
+                'attendance_status': g.attendance_status or '',
+                'is_attending': bool(g.is_attending),
+                'message_sent': bool(g.message_sent),
+                'response_date': g.response_date.isoformat() if g.response_date else '',
+                'notes': g.notes or '',
+                'table_number': g.table_number or '',
+                'added_by': g.added_by or '',
+                'unique_token': g.unique_token,
+                'created_at': g.created_at.isoformat() if g.created_at else ''
+            })
+
+        df = pd.DataFrame(rows)
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+            df.to_excel(tmp.name, index=False, engine='openpyxl')
+            tmp_path = tmp.name
+
+        return send_file(
+            tmp_path,
+            as_attachment=True,
+            download_name=f'wedding_guests_full_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx',
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+    except Exception as e:
+        flash(f'שגיאה בייצוא האורחים: {str(e)}', 'error')
         return redirect(url_for('admin'))
 
 if __name__ == '__main__':

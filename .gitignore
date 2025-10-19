@@ -54,6 +54,8 @@ instance/
 
 # Chrome/Chromium user data (whatsapp profile data and browser cache)
 whatsapp_profile/
+whatsapp_profile_remote/
+.env.example
 
 # OS files
 .DS_Store

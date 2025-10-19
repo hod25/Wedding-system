@@ -75,6 +75,13 @@
                     <i class="fas fa-chair"></i> סידור ישיבה
                 </a>
             </div>
+            <div class="d-flex align-items-center">
+                {% if session.get('admin_logged_in') %}
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('logout') }}">התנתק</a>
+                {% else %}
+                    <a class="btn btn-outline-primary btn-sm" href="{{ url_for('login') }}">כניסה</a>
+                {% endif %}
+            </div>
         </div>
     </nav>
 
