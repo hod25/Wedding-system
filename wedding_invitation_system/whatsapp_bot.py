@@ -63,17 +63,13 @@ class WhatsAppBot:
             "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         )
 
-        # In production/server environment, don't use persistent profile
-        if os.getenv("RENDER") or os.getenv("PORT"):
-            # Running in production - don't persist profile
-            print("🔧 Running in production mode - temporary profile")
-        else:
-            # Local development - use persistent profile
-            profile_path = os.path.join(os.getcwd(), "whatsapp_profile")
+        # Local development - use persistent profile when available
+        profile_path = os.path.join(os.getcwd(), "whatsapp_profile")
+        if os.path.exists(profile_path):
             chrome_options.add_argument(f"--user-data-dir={profile_path}")
 
         try:
-            # Check for Chrome binary in common locations for Render/production
+            # Check for Chrome binary in common locations for production
             chrome_binary_path = None
             possible_paths = [
                 "/usr/bin/google-chrome-stable",  # Most common location after apt install

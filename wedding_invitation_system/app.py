@@ -398,7 +398,6 @@ def debug_chrome():
     chrome_available = check_chrome_availability()
     hints = {
         'chrome_available': chrome_available,
-        'render_env': bool(os.getenv('RENDER')),
         'port_set': bool(os.getenv('PORT')),
         'database_url': bool(os.getenv('DATABASE_URL')),
         'website_url': os.getenv('WEBSITE_URL', DEFAULT_WEBSITE_URL),

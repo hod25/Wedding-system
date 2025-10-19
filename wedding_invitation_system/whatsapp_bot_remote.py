@@ -1,15 +1,15 @@
 """Remote-mode WhatsApp bot.
 
-Runs locally and talks to the hosted Flask app (e.g. Render) via the bot API endpoints:
+Runs locally and talks to the hosted Flask app via the bot API endpoints:
   GET  /api/bot/pending        - fetch guests to send messages to
   POST /api/bot/mark           - report successes / failures
   GET  /api/bot/logs?limit=50  - (optional) view recent logs
 
 Usage:
   1. Set environment variables (put in .env next to this file):
-       BOT_API_KEY=YOUR_SECRET_KEY
-       REMOTE_BASE_URL=https://wedding-system-ry2j.onrender.com
-       WEBSITE_URL=https://wedding-system-ry2j.onrender.com
+      BOT_API_KEY=YOUR_SECRET_KEY
+      REMOTE_BASE_URL=https://your-deployed-site.example.com
+      WEBSITE_URL=https://your-deployed-site.example.com
        COUPLE_NAMES=הוד ונעם
        WEDDING_DATE=01/01/2026
   2. Run first time with wait so you can scan QR and preserve session:

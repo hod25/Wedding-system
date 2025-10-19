@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Entry point for the Wedding Invitation System Flask application.
-This file serves as the main entry point for deployment platforms like Render.
+This file serves as the main entry point for deployment platforms.
 """
 
 import sys
