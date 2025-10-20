@@ -58,7 +58,7 @@ def require_admin_for_nonpublic():
     path = request.path
     if any(path.startswith(p) for p in public_prefixes):
         return None
-    if path in ['/login', '/logout']:
+    if path in ['/login', '/logout', '/health']:
         return None
     if is_logged_in():
         return None
