@@ -27,6 +27,11 @@ db = SQLAlchemy(app)
 from functools import wraps
 from flask import session
 
+# Simple health check route
+@app.get("/health")
+def health():
+    return jsonify({"ok": True}), 200
+
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD')
 
