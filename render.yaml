@@ -8,6 +8,12 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12
+      - key: WEBSITE_URL
+        value: https://wedding-system-ry2j.onrender.com
+      - key: ADMIN_USERNAME
+        value: Admin
+      - key: ADMIN_PASSWORD
+        sync: false  # הזן ידנית ב-Render Dashboard
       - key: DATABASE_URL
         generateValue: true
       - key: SECRET_KEY

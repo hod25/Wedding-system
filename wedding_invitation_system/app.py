@@ -1059,47 +1059,50 @@ def download_template():
 
 @app.route('/export_guests')
 def export_guests():
-    """Export full guest list to Excel with all useful fields for admin.
-    Matches the admin template link `export_guests`.
-    """
-    try:
-        guests = Guest.query.order_by(Guest.id.asc()).all()
-        rows = []
-        for g in guests:
-            rows.append({
-                'id': g.id,
-                'name': g.name,
-                'phone': g.phone,
-                'email': g.email or '',
-                'invited_count': g.invited_count,
-                'confirmed_count': g.confirmed_count,
-                'group_affiliation': g.group_affiliation or '',
-                'side': g.side or '',
-                'attendance_status': g.attendance_status or '',
-                'is_attending': bool(g.is_attending),
-                'message_sent': bool(g.message_sent),
-                'response_date': g.response_date.isoformat() if g.response_date else '',
-                'notes': g.notes or '',
-                'table_number': g.table_number or '',
-                'added_by': g.added_by or '',
-                'unique_token': g.unique_token,
-                'created_at': g.created_at.isoformat() if g.created_at else ''
-            })
-
-        df = pd.DataFrame(rows)
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
-            df.to_excel(tmp.name, index=False, engine='openpyxl')
-            tmp_path = tmp.name
-
-        return send_file(
-            tmp_path,
-            as_attachment=True,
-            download_name=f'wedding_guests_full_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx',
-            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-    except Exception as e:
-        flash(f'שגיאה בייצוא האורחים: {str(e)}', 'error')
-        return redirect(url_for('admin'))
+    guests = Guest.query.all()
+    # כותרת ראשית כמו בדוגמה
+    header_row = [
+        'קובץ רשימות מוזמנים לחתונה, שנוצר באמצעות אפליקציית מאורסים מאורסות'] * 11
+    columns = [
+        'שם המוזמן', 'נייד', 'כמה יגיעו', 'שיוך לקבוצה', 'מהצד של...',
+        'סטטוס הגעה (יגיע, מתלבט, לא יגיע)', 'סכום מתנה משוער', 'האם נשלחה הזמנה? (נשלחה, לא נשלחה)',
+        'mail', 'הערות (מלל חופשי)', 'מספר הטלפון של המשתמש שהכניס את המוזמן באפליקציה'
+    ]
+    rows = []
+    for g in guests:
+        status = g.attendance_status or ('יגיע' if g.is_attending else 'לא יגיע' if g.is_attending is False else 'ממתין')
+        sent_status = 'נשלחה' if g.message_sent else 'לא נשלחה'
+        rows.append([
+            g.name,
+            g.phone,
+            g.invited_count,
+            g.group_affiliation or '',
+            g.side or '',
+            status,
+            int(g.estimated_gift_amount) if g.estimated_gift_amount else '',
+            sent_status,
+            g.email or '',
+            g.notes or '',
+            g.added_by or ''
+        ])
+    import openpyxl
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.append(header_row)
+    ws.append(columns)
+    for row in rows:
+        ws.append(row)
+    # שמירה לקובץ זמני
+    with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+        wb.save(tmp.name)
+        tmp_path = tmp.name
+    return send_file(
+        tmp_path,
+        as_attachment=True,
+        download_name=f'wedding_guests_{datetime.now().strftime("%Y%m%d_%H%M%S")}.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

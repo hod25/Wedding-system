@@ -20,11 +20,6 @@
             <a href="{{ url_for('add_guest') }}" class="btn btn-primary btn-sm">
                 <i class="fas fa-user-plus"></i> הוסף אורח
             </a>
-            {% if session.admin_logged_in %}
-            <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm" title="התנתק">
-                <i class="fas fa-sign-out-alt"></i> התנתק
-            </a>
-            {% endif %}
             <div class="btn-group" role="group">
                 <button type="button" class="btn btn-info btn-sm dropdown-toggle" data-bs-toggle="dropdown">
                     <i class="fas fa-file-import"></i> ייבוא/ייצוא
